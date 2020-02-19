@@ -11,6 +11,7 @@ import numpy.matlib
 import scipy as sp
 
 import geopandas as gpd
+from fbprophet import Prophet
 
 # Plotting
 import matplotlib.pyplot as plt
@@ -147,4 +148,140 @@ for i, year in enumerate(years):
 
     ax[i].set_title(year)
     my_map.plot(ax = ax[i], column = 'counts', cmap='OrRd', vmax = 4, legend=True)
+
+
+# ### Fit a simple time series forecasting model
+
+# In[15]:
+
+
+# assemble dataframe of counts of fires per date
+df_proph = pd.DataFrame()
+df_proph['ds'] = df.groupby('ACQ_DATE').count().index
+df_proph['y'] = df.groupby('ACQ_DATE').count().iloc[:,0].values
+
+
+# In[16]:
+
+
+df_proph.head()
+
+
+# In[17]:
+
+
+# Make the prophet model and fit on the data
+my_prophet = Prophet(changepoint_prior_scale=0.15)
+my_prophet.fit(df_proph)
+
+
+# In[18]:
+
+
+# Make a future dataframe for 2 years
+my_forecast = my_prophet.make_future_dataframe(periods=365, freq='D')
+# Make predictions
+my_forecast = my_prophet.predict(my_forecast)
+
+
+# In[19]:
+
+
+my_prophet.plot(my_forecast, xlabel = 'Date', ylabel = 'Fire Counts')
+plt.title('Fire Counts');
+
+
+# Well, last yeaer certainly was a big ol' outlier
+
+# In[20]:
+
+
+# Plot the trends and patterns
+my_prophet.plot_components(my_forecast);
+
+
+# ## Regional plots
+
+# Let's pull out a region in NSW that regularly has fires
+
+# In[21]:
+
+
+postcodes = (2877, 2875, 2873, 2825, 2835)
+my_region = gpd.GeoDataFrame()
+df_region = pd.DataFrame()
+for postcode in postcodes:
+    region_tmp = my_map[my_map['code'] == postcode]
+    df_tmp = df.loc[df['postcode'] == postcode,:]
+    
+    my_region = pd.concat((my_region, region_tmp), axis = 0)
+    df_region = pd.concat((df_region, df_tmp), axis = 0)
+
+
+# In[22]:
+
+
+fig, ax = plt.subplots(figsize = (5,5))
+ax.set_title('postcode: ' + str(postcode))
+my_map.plot(ax = ax)
+my_region.plot(ax = ax, color = 'g')
+df_region.plot(ax = ax, column='BRIGHT_T31', cmap='hot')
+
+
+# In[23]:
+
+
+fig, ax = plt.subplots(figsize = (10,5))
+sns.barplot(x = df_region[['year','month']].groupby('year').count().index,
+            y = df_region[['year','month']].groupby('year').count().values.reshape(-1), ax = ax)
+ax.set_xlabel('Year')
+ax.set_ylabel('Counts')
+
+
+# ### Fit time series forecasting model
+
+# In[24]:
+
+
+# assemble dataframe of counts of fires per date
+df_proph = pd.DataFrame()
+df_proph['ds'] = df_region.groupby('ACQ_DATE').count().index
+df_proph['y'] = df_region.groupby('ACQ_DATE').count().iloc[:,0].values
+
+
+# In[25]:
+
+
+df_proph.head()
+
+
+# In[26]:
+
+
+# Make the prophet model and fit on the data
+my_prophet = Prophet(changepoint_prior_scale=0.15)
+my_prophet.fit(df_proph)
+
+
+# In[27]:
+
+
+# Make a future dataframe for 2 years
+my_forecast = my_prophet.make_future_dataframe(periods=365, freq='D')
+# Make predictions
+my_forecast = my_prophet.predict(my_forecast)
+
+
+# In[28]:
+
+
+my_prophet.plot(my_forecast, xlabel = 'Date', ylabel = 'Fire Counts')
+plt.title('Fire Counts');
+
+
+# In[29]:
+
+
+# Plot the trends and patterns
+my_prophet.plot_components(my_forecast);
 
